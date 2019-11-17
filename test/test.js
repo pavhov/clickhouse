@@ -2,7 +2,7 @@ const
 	stream         = require('stream'),
 	expect         = require('expect.js'),
 	_              = require('lodash'),
-	{ ClickHouse } = require('../.');
+	{ ClickHouse } = require('../out/.');
 
 const database = 'test_' + _.random(1000, 100000);
 
@@ -133,9 +133,13 @@ describe('Select', () => {
 		let error = null;
 		
 		clickhouse.query(sql).stream()
-			.on('data', () => ++i)
+			.on('data', () => {
+				++i
+			})
 			// TODO: on this case you should catch error
-			.on('error', err => callback(err))
+			.on('error', err => {
+				callback(err)
+			})
 			.on('end', () => {
 				expect(error).to.not.be.ok();
 				expect(i).to.be(rowCount);

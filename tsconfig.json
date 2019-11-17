@@ -1,0 +1,43 @@
+{
+  "compileOnSave": true,
+  "files": [
+    "./src/index.ts"
+  ],
+  "compilerOptions": {
+    "alwaysStrict": true,
+    "declaration": true,
+    "esModuleInterop": true,
+    "incremental": true,
+    "target": "esnext",
+    "lib": [
+      "esnext",
+      "esnext.array",
+      "esnext.asynciterable",
+      "esnext.bigint",
+      "esnext.intl",
+      "esnext.symbol",
+      "dom",
+      "dom.iterable"
+    ],
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "noEmitOnError": true,
+    "noImplicitAny": false,
+    "noImplicitReturns": true,
+    "noImplicitThis": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "pretty": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "strictBindCallApply": true,
+    "strictFunctionTypes": true,
+    "strictNullChecks": true,
+    "strictPropertyInitialization": true,
+    "watch": true,
+    "typeRoots": [
+      "./src/types"
+    ],
+    "outDir": "./out"
+  }
+}
