@@ -11,7 +11,7 @@ npm i @arm.tech/clckh
 Example:
 
 ```javascript
-const { ClickHouse } = require('@arm.tech/clckh');
+const ClickHouse = require('@arm.tech/clckh');
 
 const clckh = new ClickHouse();
 ```
