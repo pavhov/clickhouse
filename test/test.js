@@ -2,7 +2,7 @@ const
 	stream         = require('stream'),
 	expect         = require('expect.js'),
 	_              = require('lodash'),
-	{ ClickHouse } = require('../out/.');
+	ClickHouse = require('../out/.').default;
 
 const database = 'test_' + _.random(1000, 100000);
 
@@ -334,11 +334,11 @@ describe('TLS/SSL Protocol', () => {
 					res.writeHead(200);
 					res.end('{\n\t"meta":\n\t[\n\t\t{\n\t\t\t"name": "plus(1, 1)",\n\t\t\t"type": "UInt16"\n\t\t}\n\t],\n\n\t"data":\n\t[\n\t\t{\n\t\t\t"plus(1, 1)": 2\n\t\t}\n\t],\n\n\t"rows": 1,\n\n\t"statistics":\n\t{\n\t\t"elapsed": 0.000037755,\n\t\t"rows_read": 1,\n\t\t"bytes_read": 1\n\t}\n}\n');
 				})
-				.listen(8000);
+				.listen(8002);
 			
 			const temp = new ClickHouse({
 				url       : 'https://localhost',
-				port      : 8000,
+				port      : 8002,
 				reqParams : {
 					agentOptions: {
 						ca: fs.readFileSync('test/cert/server.crt'),
@@ -386,19 +386,18 @@ describe('queries', () => {
 		
 		const rows = [
 			{
-				date: '2018-01-01',
-				str: 'Вам, проживающим за оргией оргию,',
-				arr: [],
-				arr2: ['1915-01-02', '1915-01-03'],
-				arr3: [1,2,3,4,5]
+				date: '2018-02-01',
+				str: 'имеющим ванную и теплый клозет!',
+				arr: ['5670000000', 'asdas dasf'],
+				arr2: ['1915-01-01'],
+				arr3: [1, 2, 3, 4]
 			},
-			
 			{
 				date: '2018-02-01',
 				str: 'имеющим ванную и теплый клозет!',
 				arr: ['5670000000', 'asdas dasf'],
 				arr2: ['1915-02-02'],
-				arr3: []
+				arr3: [1, 2, 3, 4]
 			}
 		];
 		

@@ -1,24 +1,24 @@
-# clickhouse
+# @arm.tech/clckh
 NodeJS client for [ClickHouse](https://clickhouse.yandex/).
 Send query over HTTP interface.
 
 Install:
 
 ```bash
-npm i clickhouse
+npm i @arm.tech/clckh
 ```
 
 Example:
 
 ```javascript
-const { ClickHouse } = require('clickhouse');
+const { ClickHouse } = require('@arm.tech/clckh');
 
-const clickhouse = new ClickHouse();
+const clckh = new ClickHouse();
 ```
 or with all options:
 
 ```javascript
-const clickhouse = new ClickHouse({
+const clckh = new ClickHouse({
 	url: 'http://localhost',
 	port: 8123,
 	debug: false,
@@ -72,7 +72,7 @@ const queries = [
 ];
 
 for(const query of queries) {
-	const r = await clickhouse.query(query).toPromise();
+	const r = await clckh.query(query).toPromise();
 
 	console.log(query, r);
 }
@@ -82,7 +82,7 @@ for(const query of queries) {
 
 Exec by callback way:
 ```javascript
-clickhouse.query(query).exec(function (err, rows) {
+clckh.query(query).exec(function (err, rows) {
 	...
 });
 ````
@@ -91,7 +91,7 @@ clickhouse.query(query).exec(function (err, rows) {
 
 Stream:
 ```javascript
-clickhouse.query(`SELECT number FROM system.numbers LIMIT 10`).stream()
+clckh.query(`SELECT number FROM system.numbers LIMIT 10`).stream()
 	.on('data', function() {
 		const stream = this;
 
@@ -112,7 +112,7 @@ clickhouse.query(`SELECT number FROM system.numbers LIMIT 10`).stream()
 or **async** stream:
 ```javascript
 // async iteration
-for await (const row of clickhouse.query(sql).stream()) {
+for await (const row of clckh.query(sql).stream()) {
 	console.log(row);
 }
 ```
@@ -121,10 +121,10 @@ for await (const row of clickhouse.query(sql).stream()) {
 
 As promise:
 ```javascript
-const rows = await clickhouse.query(query).toPromise();
+const rows = await clckh.query(query).toPromise();
 
 // use query with external data
-const rows = await clickhouse.query('SELECT * AS count FROM temp_table', {
+const rows = await clckh.query('SELECT * AS count FROM temp_table', {
 	external: [
 		{
 			name: 'temp_table',
@@ -138,8 +138,8 @@ const rows = await clickhouse.query('SELECT * AS count FROM temp_table', {
 
 Set session:
 ```javascript
-clickhouse.sessionId = '...';
-const r = await clickhouse.query(
+clckh.sessionId = '...';
+const r = await clckh.query(
 	`CREATE TEMPORARY TABLE test_table
 	(_id String, str String)
 	ENGINE=Memory`
@@ -149,7 +149,7 @@ const r = await clickhouse.query(
 
 Insert stream:
 ```javascript
-const ws = clickhouse.insert('INSERT INTO session_temp').stream();
+const ws = clckh.insert('INSERT INTO session_temp').stream();
 for(let i = 0; i <= 1000; i++) {
 	await ws.writeRow(
 		[
@@ -168,7 +168,7 @@ const result = await ws.exec();
 
 Pipe readable stream to writable stream (across transform):
 ```javascript
-const rs = clickhouse.query(query).stream();
+const rs = clckh.query(query).stream();
 
 const tf = new stream.Transform({
 	objectMode : true,
@@ -177,22 +177,10 @@ const tf = new stream.Transform({
 	}
 });
 
-clickhouse.sessionId = Date.now();
-const ws = clickhouse.insert('INSERT INTO session_temp2').stream();
+clckh.sessionId = Date.now();
+const ws = clckh.insert('INSERT INTO session_temp2').stream();
 
 const result = await rs.pipe(tf).pipe(ws).exec();
 ```
 
 ***
-
-**Changelogs**:
-* 2019-02-13
-	- Add compatibility with user and username options 
-* 2019-02-07
-	- Add TLS/SSL Protocol support
-	- Add async iteration over SELECT
-	
-	
-	
-**Links**
-* request lib doc https://github.com/request/request#requestoptions-callback

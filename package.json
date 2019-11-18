@@ -1,6 +1,6 @@
 {
   "name": "@arm.tech/clckh",
-  "version": "0.0.2-rc",
+  "version": "0.0.4-rc",
   "description": "ClickHouse is an open source column-oriented database management system capable of real time generation of analytical data reports using SQL queries.",
   "main": "src/index.ts",
   "directories": {
