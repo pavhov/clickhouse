@@ -724,3 +724,4 @@ describe('Abort query', () => {
 after(async () => {
 	await clickhouse.query(`DROP DATABASE IF EXISTS ${database}`).toPromise();
 });
+

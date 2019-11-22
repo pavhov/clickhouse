@@ -2,7 +2,7 @@
   "name": "@arm.tech/clckh",
   "version": "0.0.5-rc",
   "description": "ClickHouse is an open source column-oriented database management system capable of real time generation of analytical data reports using SQL queries.",
-  "main": "src/index.ts",
+  "main": "out/index.js",
   "directories": {
     "test": "test"
   },
@@ -66,8 +66,10 @@
   },
   "devDependencies": {
     "chai": "^4.2.0",
+    "jsdoc": "^3.6.3",
     "mocha": "^6.2.2",
     "nodemon": "^1.19.4",
+    "typedoc": "^0.15.2",
     "typescript": "^3.7.2"
   },
   "optionalDependencies": {
@@ -81,7 +83,8 @@
     "test": "mocha test --timeout 60000 --slow 5000",
     "build": "tsc -b ./tsconfig.json",
     "watch": "tsc -b ./tsconfig.json -w",
-    "postinstall": "tsc -b ./tsconfig.json"
+    "postinstall": "tsc -b ./tsconfig.json",
+    "doc": "typedoc"
   },
   "repository": {
     "type": "git",

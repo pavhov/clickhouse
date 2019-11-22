@@ -19,35 +19,36 @@ or with all options:
 
 ```javascript
 const clckh = new ClickHouse({
-	url: 'http://localhost',
-	port: 8123,
-	debug: false,
-	basicAuth: null,
-	isUseGzip: false,
-        format: "json", // "json" || "csv" || "tsv"
-	config: {
-		session_timeout                         : 60,
-		output_format_json_quote_64bit_integers : 0,
-		enable_http_compression                 : 0
-	},
+                url: 'http://localhost',
+                port: 8123,
+                debug: false,
+                basicAuth: null,
+                isUseGzip: false,
+                format: "json", // "json" || "csv" || "tsv"
+                config: {
+                    session_timeout                         : 60,
+                    output_format_json_quote_64bit_integers : 0,
+                    enable_http_compression                 : 0
+                },
 	
-	// This object merge with request params (see request lib docs)
-	reqParams: {
-		...
-	}
-});
+	            // This object merge with request params (see request lib docs)
+                reqParams: {
+                ...
+                }
+            });
 ```
 
 or change 
-
+```
 	basicAuth: null
+```
 to
-
+```
 	basicAuth: {
 	username: 'default',
 	password: '',
 	},
-
+```
 
 ***
  

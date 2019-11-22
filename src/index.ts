@@ -1,4 +1,5 @@
-"use strict";
+import "./Dafault";
+
 
 import zlib from "zlib";
 
@@ -6,55 +7,13 @@ import _ from "lodash";
 import request from "request";
 import stream from "stream";
 import querystring from "querystring";
-import JSONStream from "JSONStream";
-import through, { ThroughStream } from "through";
 import stream2asynciter from "stream2asynciter";
-import { URL } from "url";
-import tsv from "tsv";
+import {URL} from "url";
 
+import Parser from "./Parser";
+import RError from "./Error";
+import ReqStream from "./ReqStream";
 
-/**
- * Content-Encoding: gzip
- * Accept-Encoding: gzip
- * и включить настройку ClickHouse enable_http_compression.
- *
- * session_id
- *
- * session_timeout
- */
-
-const SEPARATORS = {
-    TSV: "\t",
-    CSV: ",",
-    Values: ",",
-};
-
-const ALIASES = {
-    TabSeparated: "TSV",
-};
-
-const ESCAPE_STRING = {
-    TSV: function (v, _quote) {
-        return v
-            .replace(/\\/g, "\\\\")
-            .replace(/\\/g, "\\")
-            .replace(/\t/g, "\\t")
-            .replace(/\n/g, "\\n");
-    },
-    CSV: function (v, _quote) {
-        return v
-            .replace(/\"/g, "");
-    },
-};
-
-const ESCAPE_NULL = {
-    TSV: "\\N",
-    CSV: "\\N",
-    Values: "\\N",
-    // JSONEachRow: "\\N",
-};
-
-const R_ERROR = new RegExp("Code: ([0-9]{2}), .*Exception:");
 
 const URI = "localhost";
 
@@ -63,250 +22,8 @@ const PORT = 8123;
 const DATABASE = "default";
 const USERNAME = "default";
 
-function parseCSV(body, options = {header: true}) {
-    const data = new tsv.Parser(SEPARATORS.CSV, options).parse(body);
-    data.splice(data.length - 1, 1);
-    return data;
-}
-
-function parseJSON(body) {
-    return JSON.parse(body);
-}
-
-function parseTSV(body, options = {header: true}) {
-    const data = new tsv.Parser(SEPARATORS.TSV, options).parse(body);
-    data.splice(data.length - 1, 1);
-    return data;
-}
-
-function parseCSVStream(s) {
-    let isFirst = true;
-    let ref = {
-        fields: [],
-    };
-    return through(function (this: ThroughStream, chunk) {
-        let str = chunk.toString();
-        let parsed = parseCSV(str, {header: isFirst});
-        let strarr = str.split("\n");
-        let plen = (isFirst && strarr.length - 1 || strarr.length) - parsed.length;
-
-        if (!isFirst) {
-            chunk = Buffer.concat([Buffer.from([...s].join("\n")), chunk]).toString();
-            parsed = parseCSV(str, {header: isFirst});
-            s = new Set();
-        }
-        strarr.splice(strarr.length - plen).forEach((value => s.add(value)));
-        chunkBuilder.call(this, isFirst, ref, str, parsed);
-        isFirst = false;
-    });
-}
-
-function parseJSONStream() {
-    return JSONStream.parse(["data", true]);
-}
-
-function parseTSVStream(s) {
-    let isFirst = true;
-    let ref = {
-        fields: [],
-    };
-    return through(function (this: ThroughStream, chunk) {
-        let str = chunk.toString();
-        let parsed = parseTSV(str, {header: isFirst});
-        let strarr = str.split("\n");
-        let plen = (isFirst && strarr.length - 1 || strarr.length) - parsed.length;
-
-        if (!isFirst) {
-            chunk = Buffer.concat([Buffer.from([...s].join("\n")), chunk]).toString();
-            parsed = parseTSV(str, {header: isFirst});
-            s = new Set();
-        }
-        strarr.splice(strarr.length - plen).forEach((value => s.add(value)));
-        chunkBuilder.call(this, isFirst, ref, str, parsed);
-        isFirst = false;
-    });
-}
-
-function chunkBuilder(this: ThroughStream | any, isFirst, ref, _chunk, parsed) {
-    if (isFirst) {
-        ref.fields = Object.keys(parsed[0]);
-        parsed.forEach((value) => {
-            this.queue(value);
-        });
-    } else {
-        parsed.forEach((value) => {
-            let result: any | null = {};
-            ref.fields.forEach((field, index) => (result[field] = value[index]));
-            this.queue(result);
-            result = null;
-        });
-    }
-}
-
-function encodeValue(quote: boolean, v: any, format: string = "TabSeparated", isArray?: boolean) {
-    format = ALIASES[format] || format;
-
-    switch (typeof v) {
-        case "string":
-            if (isArray) {
-                return `"${ESCAPE_STRING[format] ? ESCAPE_STRING[format](v, quote) : v}"`;
-            } else {
-                return ESCAPE_STRING[format] ? ESCAPE_STRING[format](v, quote) : v;
-            }
-        case "number":
-            if (isNaN(v))
-                return "nan";
-            if (v === +Infinity)
-                return "+inf";
-            if (v === -Infinity)
-                return "-inf";
-            if (v === Infinity)
-                return "inf";
-            return v;
-        case "object":
-
-            // clickhouse allows to use unix timestamp in seconds
-            if (v instanceof Date) {
-                return ("" + v.valueOf()).substr(0, 10);
-            }
-
-            // you can add array items
-            if (v instanceof Array) {
-                // return "[" + v.map(encodeValue.bind(this, true, format)).join (",") + "]";
-                return "[" + v.map(function (i) {
-                    return encodeValue(true, i, format, true);
-                }).join(",") + "]";
-            }
-
-            // TODO: tuples support
-            if (!format) {
-                console.trace();
-            }
-
-            if (v === null) {
-                return format in ESCAPE_NULL ? ESCAPE_NULL[format] : v;
-            }
-
-            return format in ESCAPE_NULL ? ESCAPE_NULL[format] : v;
-        case "boolean":
-            return v ? 1 : 0;
-    }
-}
-
-function getErrorObj(res) {
-    let err: any = new Error(`${res.statusCode}: ${res.body || res.statusMessage}`);
-
-    if (res.body) {
-        let m = res.body.match(R_ERROR);
-        if (m) {
-            if (m[1] && !isNaN(parseInt(m[1]))) {
-                err.code = parseInt(m[1]);
-            }
-
-            if (m[2]) {
-                err.message = m[2];
-            }
-        }
-    }
-
-    return err;
-}
-
 function isObject(obj) {
     return Object.prototype.toString.call(obj) === "[object Object]";
-}
-
-class Rs extends stream.Transform {
-    // @ts-ignore
-    private _ws: request.Request;
-    // @ts-ignore
-    private _isPiped: boolean;
-    // @ts-ignore
-    private _rowCount: number;
-    // @ts-ignore
-    _query: string;
-
-    constructor(reqParams) {
-        super();
-
-        let me = this;
-
-        me._ws = request.post(reqParams);
-
-        me._isPiped = false;
-
-        // Без этого обработчика и вызова read Transform не отрабатывает до конца
-        // https://nodejs.org/api/stream.html#stream_implementing_a_transform_stream
-        // Writing data while the stream is not draining is particularly problematic for a Transform,
-        // because the Transform streams are paused by default until they are piped or
-        // an "data" or "readable" event handler is added.
-        me.on("readable", function () {
-            // let _data = me.read();
-        });
-
-        me.pipe(me._ws);
-
-        me.on("pipe", function () {
-            me._isPiped = true;
-        });
-    }
-
-    _transform(chunk, _encoding, cb) {
-        cb(null, chunk);
-    }
-
-    writeRow(data) {
-        let row = "";
-
-        if (Array.isArray(data)) {
-            row = ClickHouse.mapRowAsArray(data);
-        } else if (isObject(data)) {
-            throw new Error("Sorry, but it is not work!");
-        }
-
-        let isOk = this.write(
-            row + "\n",
-        );
-
-        this._rowCount++;
-
-        if (isOk) {
-            return Promise.resolve();
-        } else {
-            return new Promise((resolve, reject) => {
-                this._ws.once("drain", err => {
-                    if (err) return reject(err);
-
-                    resolve();
-                });
-            });
-        }
-    }
-
-
-    exec() {
-        let me = this;
-
-        return new Promise((resolve, reject) => {
-            me._ws
-              .on("error", function (err) {
-                  reject(err);
-              })
-              .on("response", function (res) {
-                  if (res.statusCode === 200) {
-                      return resolve({r: 1});
-                  }
-
-                  return reject(
-                      getErrorObj(res),
-                  );
-              });
-
-            if (!me._isPiped) {
-                me.end();
-            }
-        });
-    }
 }
 
 class QueryCursor {
@@ -357,7 +74,7 @@ class QueryCursor {
                 return cb(err);
             } else if (res.statusCode !== 200) {
                 return cb(
-                    getErrorObj(res),
+                    new RError(res),
                 );
             }
 
@@ -382,13 +99,13 @@ class QueryCursor {
         let result = null;
         switch (this._getFormat()) {
             case "json":
-                result = !isStream && parseJSON(body) || parseJSONStream();
+                result = !isStream && Parser.instance().parseJSON(body) || Parser.instance().parseJSONStream();
                 break;
             case "tsv":
-                result = !isStream && parseTSV(body) || parseTSVStream(new Set());
+                result = !isStream && Parser.instance().parseTSV(body) || Parser.instance().parseTSVStream(new Set());
                 break;
             case "csv":
-                result = !isStream && parseCSV(body) || parseCSVStream(new Set());
+                result = !isStream && Parser.instance().parseCSV(body) || Parser.instance().parseCSVStream(new Set());
                 break;
             default:
                 result = body;
@@ -427,7 +144,7 @@ class QueryCursor {
         }
 
         if (me._isInsert) {
-            const rs = new Rs(this._reqParams);
+            const rs = new ReqStream(this._reqParams, this._getFormat());
             rs._query = this._query;
 
             me._request = rs;
@@ -648,12 +365,6 @@ class ClickHouse {
         return str.replace(/[\t\n]/g, "\\t");
     }
 
-    static mapRowAsArray(row) {
-        return row.map(function (value) {
-            return encodeValue(false, value, "TabSeparated");
-        }).join("\t");
-    }
-
     _getFormat(query) {
         let format = "";
         switch (this._opts.format) {
@@ -684,11 +395,7 @@ class ClickHouse {
         } else if (query.match(/format CSV/mg) !== null) {
             this._opts.sessionFormat = "csv";
         }
-        return "";
-    }
-
-    _mapRowAsObject(fieldList, row) {
-        return fieldList.map(f => encodeValue(false, row[f] != null ? row[f] : "", "TabSeparated")).join("\t");
+        return this._opts.sessionFormat;
     }
 
     _getBodyForInsert(query, data) {
@@ -719,9 +426,9 @@ class ClickHouse {
 
         return values.map(row => {
             if (isFirstElObject) {
-                return this._mapRowAsObject(fieldList, row);
+                return Parser.instance()._mapRowAsObject(fieldList, row, this._opts.sessionFormat);
             } else {
-                return ClickHouse.mapRowAsArray(row);
+                return Parser.instance().mapRowAsArray(row, this._opts.sessionFormat);
             }
         }).join("\n");
     }
